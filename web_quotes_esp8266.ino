@@ -1,13 +1,19 @@
+#include <Arduino.h>
 #include <string.h>
 
 #include <ESP8266WiFi.h>
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_EPD.h>
-#include <Fonts/FreeMono9pt7b.h>
+#include <Fonts/FreeSerif9pt7b.h>
+
+#include "string_slice.h"
+#include "simple_http_parser.hpp"
 
 // SSID & password
 #include "secrets.h"
+
+using namespace scottz0r;
 
 // E-Ink configuration
 constexpr auto SD_CS = 2;
@@ -123,24 +129,29 @@ void fetch_web()
     Serial.print(" max).\r\n");
 
     Serial.print("Now displaying...\r\n\r\n");
-    write_to_display();
-
+    
     client.stop();
+
+    auto buffer_slice = StringSlice(buffer, i);
+    auto http_body = http::get_body(buffer_slice);
+
+    write_to_display(http_body);
 
     // TODO: Send to power down mode.
 }
 
-void write_to_display()
+void write_to_display(const StringSlice& text)
 {
     display.clearBuffer();
-    display.setCursor(0, 0);
+    // Set down a few pixels because the font is much higher than the default 6px baseline.
+    display.setCursor(0, 10);
     display.setTextSize(1);
-    // This font is too large to put the entire HTTP response.
-    //display.setFont(&FreeMono9pt7b);
+    // TODO: Wrap at a word boundary instead of any character.
+    display.setFont(&FreeSerif9pt7b);
     display.setTextColor(EPD_BLACK);
     display.setTextWrap(true);
 
-    display.print(buffer);
+    display.write(text.data(), text.size());
 
     display.display();
 
