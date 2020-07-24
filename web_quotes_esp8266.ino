@@ -6,12 +6,15 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_EPD.h>
 #include <Fonts/FreeSerif9pt7b.h>
+#include <Fonts/FreeSans9pt7b.h>
 
 #include "string_slice.h"
 #include "simple_http_parser.hpp"
 
 // SSID & password
 #include "secrets.h"
+
+#define NDEBUG
 
 using namespace scottz0r;
 
@@ -27,6 +30,8 @@ constexpr auto EPD_BUSY = -1; // No connected on featherwing.
 const char* host = "192.168.1.101";
 const int http_port = 5000;
 
+static constexpr unsigned long REQUEST_TIMEOUT_MS = 5000;
+
 // Make this a "safe buffer"
 constexpr auto BUFFER_SIZE = 1024 * 4;
 char buffer[BUFFER_SIZE];
@@ -38,11 +43,13 @@ void setup()
     pinMode(13, OUTPUT);
     digitalWrite(13, LOW);
 
+#ifndef NDEBUG
     Serial.begin(115200);
 
     Serial.println();
     Serial.print("Connecting to ");
     Serial.println(CFG_SSID);
+#endif
 
     // Display initialization.
     display.begin();
@@ -56,33 +63,38 @@ void setup()
         Serial.print(".");
     }
 
+#ifndef NDEBUG
     Serial.println("");
     Serial.println("WiFi Connected");
     Serial.println("IP Address: ");
     Serial.println(WiFi.localIP());
+#endif
 
     auto request_size = fetch_web();
-    if(request_size == 0)
+    if(request_size > 0)
     {
-        return;
+        // Parse out HTTP body and send to display.
+        auto buffer_slice = StringSlice(buffer, request_size);
+        auto http_body = http::get_body(buffer_slice);
+
+        wrap_and_display(http_body);
     }
 
-    // Parse out HTTP body and send to display.
-    auto buffer_slice = StringSlice(buffer, request_size);
-    auto http_body = http::get_body(buffer_slice);
-
-    wrap_and_display(http_body);
-
     // Go to deep sleep. Requires pin 16 to be wired to reset. 60e6 = 1 minute.
+#ifndef NDEBUG
     Serial.println("Going to sleep...");
-    constexpr auto sleep_time = (uint64_t)60e6 * 5;
+#endif
+
+    constexpr auto sleep_time = (uint64_t)60e6 * 60;
     ESP.deepSleep(sleep_time);
 }
 
 std::size_t fetch_web()
 {
+#ifndef NDEBUG
     Serial.print("Connecting to ");
     Serial.println(host);
+#endif
 
     WiFiClient client;
     if(!client.connect(host, http_port))
@@ -92,8 +104,10 @@ std::size_t fetch_web()
     }
 
     String url = "/";
+#ifndef NDEBUG
     Serial.print("Requesting URL: ");
     Serial.println(url);
+#endif
 
     // This will send the request to the server
     // client.print(String("GET ") + url + " HTTP/1.1\r\n" +
@@ -107,13 +121,21 @@ std::size_t fetch_web()
     client.print(buffer);
 
     // Read all the lines of the reply from server and print them to Serial
+    auto timeout = millis();
     size_t i = 0;
     while(client.connected() || client.available())
     {
+        // Timeout logic for request. If all bytes not fetched, return 0 to indicate error.
+        if(millis() - timeout > REQUEST_TIMEOUT_MS)
+        {
+#ifndef NDEBUG
+    Serial.println("Client request timeout!");
+#endif
+            return 0;
+        }
+
         if(client.available())
         {
-            // String line = client.readStringUntil('\r');
-            // Serial.print(line);
             buffer[i] = client.read();
             ++i;
 
@@ -130,39 +152,21 @@ std::size_t fetch_web()
     // Always null terminate buffer.
     buffer[i] = 0;
 
+#ifndef NDEBUG
     Serial.write(buffer, i);
-
     Serial.print("\r\n");
     Serial.print("HTTP message used ");
     Serial.print(i);
     Serial.print(" bytes in buffer (");
     Serial.print(BUFFER_SIZE);
     Serial.print(" max).\r\n");
-
     Serial.print("Now displaying...\r\n\r\n");
-    
+#endif
+
     client.stop();
 
     return i;
 }
-
-// void write_to_display(const StringSlice& text)
-// {
-//     display.clearBuffer();
-//     // Set down a few pixels because the font is much higher than the default 6px baseline.
-//     display.setCursor(0, 10);
-//     display.setTextSize(1);
-//     // TODO: Wrap at a word boundary instead of any character.
-//     display.setFont(&FreeSerif9pt7b);
-//     display.setTextColor(EPD_BLACK);
-//     display.setTextWrap(true);
-
-//     display.write(text.data(), text.size());
-
-//     display.display();
-
-//     Serial.print("Display done!\r\n");
-// }
 
 static StringSlice get_word(StringSlice& buffer)
 {
@@ -189,19 +193,21 @@ static void wrap_and_display(const StringSlice& text)
 {
     StringSlice ss = text;
 
-    constexpr auto line_height = 16; // pixels
-    
+    display.clearBuffer();
+
     constexpr auto word_buffer_size = 64;
     char word_buffer[word_buffer_size];
 
-    display.clearBuffer();
+    constexpr auto top_offset = 16; // pixels
+
     display.setTextColor(EPD_BLACK);
     display.setFont(&FreeSerif9pt7b);
     display.setTextSize(1);
     display.setTextWrap(false);
-    display.setCursor(0, line_height);
+    display.setCursor(0, top_offset);
 
-    // TODO: Leftmost bound?
+    int16_t x1, y1;
+    uint16_t width, height;
 
     while(!ss.empty())
     {
@@ -213,9 +219,6 @@ static void wrap_and_display(const StringSlice& text)
             word_buffer[word.size()] = 0;
         }
     
-        int16_t x1, y1;
-        uint16_t width, height;
-
         display.getTextBounds(word_buffer, display.getCursorX(), display.getCursorY(), &x1, &y1, &width, &height);
 
         if(x1 + width > display.width())
@@ -230,6 +233,22 @@ static void wrap_and_display(const StringSlice& text)
         // Write a space after each word.
         display.write(' ');
     }
+
+    // Write the "-Bender Rodriguez" in the bottom right. Draw a line above this.
+    const char* benders_name = "Bender Rodriguez";
+    display.setTextColor(EPD_BLACK);
+    display.setFont(&FreeSans9pt7b);
+    display.setTextSize(1);
+    display.getTextBounds(benders_name, 0, 0, &x1, &y1, &width, &height);
+    
+    auto name_x = display.width() - width - 2; // Add 2px padding from the right
+    auto name_y = display.height() - 6; // 6px bottom padding (cursor position is bottom of text).
+    display.setCursor(name_x, name_y);
+    display.print(benders_name);
+
+    // Line:
+    auto line_y = name_y - height - 4;
+    display.drawFastHLine(0, line_y, display.width(), EPD_BLACK);
 
     display.display();
 }
