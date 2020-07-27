@@ -13,7 +13,7 @@ namespace scottz0r
 
         bool load_quote(std::size_t index);
 
-        // TODO - get number of quotes.
+        int get_quote_count();
 
         StringSlice get_name() const;
 

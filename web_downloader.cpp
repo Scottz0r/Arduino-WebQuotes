@@ -182,6 +182,12 @@ namespace web
 
     static bool swap_files()
     {
+        DEBUG_PRINT("Moving/swapping \"");
+        DEBUG_PRINT(download_filename);
+        DEBUG_PRINT("\" with \"");
+        DEBUG_PRINT(data_filename);
+        DEBUG_PRINTLN("\"...");
+
         if(SD.exists(data_filename))
         {
             SD.remove(data_filename);

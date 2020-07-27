@@ -8,6 +8,9 @@ namespace scottz0r
 
     // Data file for quotes.
     constexpr auto data_filename = "DATA.TXT";
+
+    // State file name
+    constexpr auto state_filename = "STATE.TXT";
 }
 
 #endif // _SCOTTZ0R_SYS_CONFIG_H_INCLUDE_GUARD

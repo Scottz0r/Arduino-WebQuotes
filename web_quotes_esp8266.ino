@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include <string.h>
-
-#include <ESP8266WiFi.h>
+#include <SD.h>
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_EPD.h>
@@ -11,9 +10,10 @@
 #include "string_slice.h"
 #include "quote_manager.h"
 #include "web_downloader.h"
+#include "state_manager.h"
 
 // Macro to turn on/off debug serial messages.
-#define NDEBUG
+// #define NDEBUG
 #include "debug_serial.h"
 
 using namespace scottz0r;
@@ -28,6 +28,8 @@ constexpr auto EPD_BUSY = -1; // No connected on featherwing.
 
 Adafruit_SSD1675 display(250, 122, EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
 
+QuoteManager quote_manager;
+
 void setup()
 {
 #ifndef NDEBUG
@@ -35,10 +37,55 @@ void setup()
 #endif
     DEBUG_PRINTLN("Starting!");
 
-    // TODO: State - if a file needs to be re-downloaded.
+    DEBUG_PRINTLN("Initializing Display...");
+    display.begin();
 
+    DEBUG_PRINTLN("Initializing SD...");
+    SD.begin(SD_CS);
 
+    // TODO: This logic should be moved to a function.
+    state::State pgm_state;
+    state::get_state(pgm_state);
+    int quote_idx = pgm_state.next_idx;
+    auto num_quotes = quote_manager.get_quote_count();
 
+    DEBUG_PRINT("Next quote index found from state: ");
+    DEBUG_PRINTLN(quote_idx);
+
+    if(num_quotes == 0 || quote_idx >= num_quotes)
+    {
+        DEBUG_PRINTLN("No quotes found or need new quotes...");
+        if(!web::download_file())
+        {
+            DEBUG_PRINTLN("Quote download failed!");
+            // TODO: Error - display failure? Can recover if file still there?
+        }
+
+        quote_idx = 0;
+    }
+    else
+    {
+        DEBUG_PRINTLN("Web download not required!");
+    }
+
+    if(quote_manager.load_quote(quote_idx))
+    {
+        DEBUG_PRINTLN("Got quote. Now displaying...");
+        StringSlice text = quote_manager.get_quote();
+        StringSlice name = quote_manager.get_name();
+        wrap_and_display(text, name);
+
+        // Save state.
+        DEBUG_PRINTLN("Saving state...");
+        pgm_state.next_idx = quote_idx + 1;
+        state::set_state(pgm_state);
+    }
+    else
+    {
+        DEBUG_PRINTLN("Quote download failed!");
+        // TODO: Error - no quote. Cannot really recover from this?
+    }
+    
     // Go to deep sleep. Requires pin 16 to be wired to reset. 60e6 = 1 minute.
     DEBUG_PRINTLN("Going to sleep...");
 
@@ -69,9 +116,13 @@ static StringSlice get_word(StringSlice& buffer)
 
 static void wrap_and_display(const StringSlice& text, const StringSlice& name)
 {
+    DEBUG_PRINTLN("Displaying start!");
+
     StringSlice ss = text;
 
     display.clearBuffer();
+
+    DEBUG_PRINTLN("Chunking and wrapping words...");
 
     constexpr auto word_buffer_size = 64;
     char word_buffer[word_buffer_size];
@@ -112,6 +163,8 @@ static void wrap_and_display(const StringSlice& text, const StringSlice& name)
         display.write(' ');
     }
 
+    DEBUG_PRINTLN("Formatting name...");
+
     // Write the name in the bottom right. Draw a line above this.
     if(name.size() < word_buffer_size)
     {
@@ -139,6 +192,8 @@ static void wrap_and_display(const StringSlice& text, const StringSlice& name)
     display.drawFastHLine(0, line_y, display.width(), EPD_BLACK);
 
     display.display();
+
+    DEBUG_PRINTLN("Displaying done!");
 }
 
 void loop()

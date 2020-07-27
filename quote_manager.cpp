@@ -34,6 +34,7 @@ namespace scottz0r
         {
             DEBUG_PRINTLN("Skipping quote");
             auto bytes_read = file.readBytesUntil('\n', m_buffer, sizeof(m_buffer));
+            ++i;
         }
 
         DEBUG_PRINTLN("Found quote");
@@ -45,13 +46,57 @@ namespace scottz0r
         }
 
         m_data_size = bytes_read;
-        m_buffer[bytes_read] = 0;
+
+        if(bytes_read < sizeof(m_buffer))
+        {
+            m_buffer[bytes_read] = 0;
+        }
+        else
+        {
+            m_buffer[sizeof(m_buffer) - 1] = 0;
+        }
 
         DEBUG_PRINTLN("Quote found!");
+        DEBUG_PRINT("Quote is: ");
+        DEBUG_PRINTLN(m_buffer);
 
         m_ready = true;
         file.close();
         return true;
+    }
+
+    int QuoteManager::get_quote_count()
+    {
+        DEBUG_PRINTLN("Counting quotes...");
+
+        if(!SD.exists(data_filename))
+        {
+            return 0;
+        }
+
+        auto file = SD.open(data_filename, FILE_READ);
+        if(!file)
+        {
+            return 0;
+        }
+
+        std::size_t i = 0;
+        while(file.available())
+        {
+            DEBUG_PRINTLN("Skipping quote");
+            auto bytes_read = file.readBytesUntil('\n', m_buffer, sizeof(m_buffer));
+
+            if(bytes_read > 0)
+            {
+                StringSlice slice(m_buffer, bytes_read);
+                if(!slice.strip().empty())
+                {
+                    ++i;
+                }
+            }
+        }
+
+        return i;
     }
 
     StringSlice QuoteManager::get_name() const
