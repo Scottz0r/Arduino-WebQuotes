@@ -54,7 +54,8 @@ void setup()
 void program_main()
 {
     // TODO: Make this config value:
-    constexpr int max_count = 24 * 7; // 24 times a day, 7 days (download every week)
+    // constexpr int max_count = 24 * 7; // 24 times a day, 7 days (download every week)
+    constexpr int max_count = 24 * 1; // 24 times a day, 1 day (download every day)
 
     state::State pgm_state;
     state::get_state(pgm_state);
