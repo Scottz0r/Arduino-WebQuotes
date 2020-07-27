@@ -47,6 +47,8 @@ namespace web
 
         disconnect_wifi();
 
+        // TODO: Need to validate file before swapping.
+
         // Swap files.
         if(!swap_files())
         {
@@ -204,6 +206,7 @@ namespace web
         if(!data_file)
         {
             DEBUG_PRINTLN("Failed to open data file.");
+            dl_file.close();
             return false;
         }
 
@@ -211,6 +214,12 @@ namespace web
         {
             data_file.write(dl_file.read());
         }
+
+        data_file.close();
+        dl_file.close();
+
+        // Cleanup "temporary" download file after copy.
+        SD.remove(download_filename);
 
         return true;
     }

@@ -216,7 +216,7 @@ static void wrap_and_display(const StringSlice& text, const StringSlice& name)
     display.setTextSize(1);
     display.getTextBounds(word_buffer, 0, 0, &x1, &y1, &width, &height);
     
-    auto name_x = display.width() - width - 2; // Add 2px padding from the right
+    auto name_x = display.width() - width - 6; // Number: add padding from the right
     auto name_y = display.height() - 6; // 6px bottom padding (cursor position is bottom of text).
     display.setCursor(name_x, name_y);
     display.print(word_buffer);

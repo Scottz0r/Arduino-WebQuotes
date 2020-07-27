@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <SD.h>
 
+#include "stream_util.h"
 #include "sys_config.h"
 #include "debug_serial.h"
 
@@ -32,29 +33,20 @@ namespace scottz0r
 
         while(file.available() && i < index)
         {
-            DEBUG_PRINTLN("Skipping quote");
-            auto bytes_read = file.readBytesUntil('\n', m_buffer, sizeof(m_buffer));
+            skip_line(file);
             ++i;
         }
 
         DEBUG_PRINTLN("Found quote");
 
-        auto bytes_read = file.readBytesUntil('\n', m_buffer, sizeof(m_buffer));
+        bool truncated;
+        auto bytes_read = get_line(file, m_buffer, sizeof(m_buffer), truncated);
         if(bytes_read == 0)
         {
             return false;
         }
 
         m_data_size = bytes_read;
-
-        if(bytes_read < sizeof(m_buffer))
-        {
-            m_buffer[bytes_read] = 0;
-        }
-        else
-        {
-            m_buffer[sizeof(m_buffer) - 1] = 0;
-        }
 
         DEBUG_PRINTLN("Quote found!");
         DEBUG_PRINT("Quote is: ");
@@ -84,8 +76,8 @@ namespace scottz0r
         while(file.available())
         {
             DEBUG_PRINTLN("Skipping quote");
-            auto bytes_read = file.readBytesUntil('\n', m_buffer, sizeof(m_buffer));
-
+            bool truncated;
+            auto bytes_read = get_line(file, m_buffer, sizeof(m_buffer), truncated);
             if(bytes_read > 0)
             {
                 StringSlice slice(m_buffer, bytes_read);

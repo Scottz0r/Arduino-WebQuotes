@@ -12,22 +12,29 @@
 - [x] Test project to download response and save to SD card.
 - [x] Put WiFi configuration on file in SD card.
 - [ ] Verify downloaded data file for assumptions (max length on name and text).
-- [ ] Better file reading and test of API/assumptions.
-  - [ ] Counting quotes and EOF handling. Does current code work as expected without an newline at EOF?
+- [x] Counting quotes and EOF handling. Does current code work as expected without an newline at EOF?
+- [ ] Verify file is valid before replacing existing file.
+  - [ ] Maximum length
+  - [ ] Max name size (63)
+  - [ ] Max text size (???)
 - [x] Make it select a random number, based off of total number of quotes, and show that.
   - [x] After n-times doing this, redownload a list form the internet.
+- [ ] Display module.
 - [ ] Configure refresh interval (CFG file).
 - [ ] Debug log to SD card (LOG.TXT).
   - [ ] Somehow enable/disable serial logging?
 - [ ] Make char buffer stuff more safe
   - [ ] Make a method to copy StringSlice to null terminated string char* buffer.
-  - [ ] Maybe a better "get_line" method for streams? That always read to a newline (or EoF).
+  - [x] Maybe a better "get_line" method for streams? That always read to a newline (or EoF).
+
+- [x] Test project: Can SecureClient make request to HTTP? Do I need logic to load another WiFiClient depending on HTTPS?
+  - Answer: No. But, this is low priority because of free file host on GitHub.
 
 ## Version 2.0
-- [ ] Change to download a file from github repo every n-times.
+- [x] Change to download a file from github repo every n-times.
   - [x] Save to SD card
   - [x] On wake up, read from SD and determine if to re-download or display a different one.
-- [ ] Have jumper to force refresh from web.
+- [x] Have jumper to force refresh from web (don't do. Can do this from modifying state file).
 
 ## Low Priority
 - [ ] Better HTTP message building without strcat.
