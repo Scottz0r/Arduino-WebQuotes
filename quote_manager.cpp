@@ -65,7 +65,7 @@ namespace scottz0r
         return true;
     }
 
-    int QuoteManager::get_quote_count()
+    unsigned QuoteManager::get_quote_count()
     {
         DEBUG_PRINTLN("Counting quotes...");
 
@@ -80,7 +80,7 @@ namespace scottz0r
             return 0;
         }
 
-        std::size_t i = 0;
+        unsigned i = 0;
         while(file.available())
         {
             DEBUG_PRINTLN("Skipping quote");

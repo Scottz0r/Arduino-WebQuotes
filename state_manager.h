@@ -7,7 +7,8 @@ namespace state
 {
     struct State
     {
-        int next_idx;
+        int last_idx;
+        int count;
     };
 
     bool get_state(State& state);

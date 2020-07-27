@@ -14,13 +14,14 @@
 - [ ] Verify downloaded data file for assumptions (max length on name and text).
 - [ ] Better file reading and test of API/assumptions.
   - [ ] Counting quotes and EOF handling. Does current code work as expected without an newline at EOF?
-- [ ] Make it select a random number, based off of total number of quotes, and show that.
-  - [ ] After n-times doing this, redownload a list form the internet.
+- [x] Make it select a random number, based off of total number of quotes, and show that.
+  - [x] After n-times doing this, redownload a list form the internet.
 - [ ] Configure refresh interval (CFG file).
 - [ ] Debug log to SD card (LOG.TXT).
   - [ ] Somehow enable/disable serial logging?
 - [ ] Make char buffer stuff more safe
   - [ ] Make a method to copy StringSlice to null terminated string char* buffer.
+  - [ ] Maybe a better "get_line" method for streams? That always read to a newline (or EoF).
 
 ## Version 2.0
 - [ ] Change to download a file from github repo every n-times.

@@ -12,8 +12,6 @@
 #include "web_downloader.h"
 #include "state_manager.h"
 
-// Macro to turn on/off debug serial messages.
-// #define NDEBUG
 #include "debug_serial.h"
 
 using namespace scottz0r;
@@ -43,16 +41,36 @@ void setup()
     DEBUG_PRINTLN("Initializing SD...");
     SD.begin(SD_CS);
 
-    // TODO: This logic should be moved to a function.
+    program_main();
+
+    // TODO: Configure Deep sleep time?
+    // Go to deep sleep. Requires pin 16 to be wired to reset. 60e6 = 1 minute.
+    DEBUG_PRINTLN("Going to sleep...");
+
+    constexpr auto sleep_time = (uint64_t)60e6 * 60;
+    ESP.deepSleep(sleep_time);
+}
+
+void program_main()
+{
+    // TODO: Make this config value:
+    constexpr int max_count = 24 * 7; // 24 times a day, 7 days (download every week)
+
     state::State pgm_state;
     state::get_state(pgm_state);
-    int quote_idx = pgm_state.next_idx;
+
     auto num_quotes = quote_manager.get_quote_count();
+    DEBUG_PRINT("Number of quotes on SD card: ");
+    DEBUG_PRINTLN(num_quotes);
+    
+    DEBUG_PRINT("Current count: ");
+    DEBUG_PRINTLN(pgm_state.count);
 
-    DEBUG_PRINT("Next quote index found from state: ");
-    DEBUG_PRINTLN(quote_idx);
+    DEBUG_PRINT("Last Index: ");
+    DEBUG_PRINTLN(pgm_state.last_idx);
 
-    if(num_quotes == 0 || quote_idx >= num_quotes)
+    // No quotes = no file, or maximum number of refreshes expired. Go fetch a new file.
+    if(num_quotes == 0 || pgm_state.count >= max_count)
     {
         DEBUG_PRINTLN("No quotes found or need new quotes...");
         if(!web::download_file())
@@ -60,15 +78,35 @@ void setup()
             DEBUG_PRINTLN("Quote download failed!");
             // TODO: Error - display failure? Can recover if file still there?
         }
+        else
+        {
+            // Reset count state on a successful download only.
+            pgm_state.count = 0;
 
-        quote_idx = 0;
+            // Update number of quotes from newly downloaded file.
+            num_quotes = quote_manager.get_quote_count();
+        }
     }
     else
     {
         DEBUG_PRINTLN("Web download not required!");
     }
 
-    if(quote_manager.load_quote(quote_idx))
+    DEBUG_PRINTLN("Generating random index...");
+
+    // WiFi must be enabled for this:
+    std::size_t random_idx;
+    auto rng = ESP.random();
+    random_idx  = rng % (unsigned)num_quotes;
+    while(random_idx == pgm_state.last_idx)
+    {
+        random_idx  = rng % (unsigned)num_quotes;
+    }
+
+    DEBUG_PRINT("Random index: ");
+    DEBUG_PRINTLN(random_idx);
+
+    if(quote_manager.load_quote(random_idx))
     {
         DEBUG_PRINTLN("Got quote. Now displaying...");
         StringSlice text = quote_manager.get_quote();
@@ -77,20 +115,15 @@ void setup()
 
         // Save state.
         DEBUG_PRINTLN("Saving state...");
-        pgm_state.next_idx = quote_idx + 1;
+        pgm_state.last_idx = random_idx;
+        pgm_state.count += 1;
         state::set_state(pgm_state);
     }
     else
     {
-        DEBUG_PRINTLN("Quote download failed!");
+        DEBUG_PRINTLN("Quote load failed!");
         // TODO: Error - no quote. Cannot really recover from this?
     }
-    
-    // Go to deep sleep. Requires pin 16 to be wired to reset. 60e6 = 1 minute.
-    DEBUG_PRINTLN("Going to sleep...");
-
-    constexpr auto sleep_time = (uint64_t)60e6 * 60;
-    ESP.deepSleep(sleep_time);
 }
 
 static StringSlice get_word(StringSlice& buffer)

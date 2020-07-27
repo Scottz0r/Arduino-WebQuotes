@@ -25,12 +25,30 @@ namespace state
             return false;
         }
 
-        // TODO: This is unsafe.
         char buffer[32];
         auto bytes_read = file.readBytesUntil('\n', buffer, sizeof(buffer));
-        buffer[bytes_read] = 0;
+        if(bytes_read < sizeof(buffer))
+        {
+            buffer[bytes_read] = 0;
+        }
+        else
+        {
+            buffer[sizeof(buffer) - 1] = 0;
+        }
+        
+        state.last_idx = atoi(buffer);
 
-        state.next_idx = atol(buffer);
+        bytes_read = file.readBytesUntil('\n', buffer, sizeof(buffer));
+        if(bytes_read < sizeof(buffer))
+        {
+            buffer[bytes_read] = 0;
+        }
+        else
+        {
+            buffer[sizeof(buffer) - 1] = 0;
+        }
+
+        state.count = atoi(buffer);
 
         file.close();
         return true;
@@ -49,7 +67,9 @@ namespace state
             return false;
         }
 
-        file.print(state.next_idx);
+        file.print(state.last_idx);
+        file.print("\r\n");
+        file.print(state.count);
         file.print("\r\n");
 
         file.close();

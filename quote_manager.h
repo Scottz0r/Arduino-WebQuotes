@@ -13,7 +13,7 @@ namespace scottz0r
 
         bool load_quote(std::size_t index);
 
-        int get_quote_count();
+        unsigned get_quote_count();
 
         StringSlice get_name() const;
 

@@ -33,27 +33,49 @@ namespace config
         std::size_t bytes_read;
         StringSlice slice;
 
+        // TODO: Maybe a "get line" function for a stream reference?
+        // WiFi SSID
         bytes_read = file.readBytesUntil('\n', buffer, sizeof(buffer));
+        if(bytes_read == 0)
+        {
+            return false;
+        }
         slice = StringSlice(buffer, bytes_read).rstrip();
         copy_slice_to(config.wifi_ssid, sizeof(config.wifi_ssid), slice);
 
-        // Password
+        // WiFi Password
         bytes_read = file.readBytesUntil('\n', buffer, sizeof(buffer));
+        if(bytes_read == 0)
+        {
+            return false;
+        }
         slice = StringSlice(buffer, bytes_read).rstrip();
         copy_slice_to(config.wifi_pwd, sizeof(config.wifi_pwd), slice);
 
         // Host
         bytes_read = file.readBytesUntil('\n', buffer, sizeof(buffer));
+        if(bytes_read == 0)
+        {
+            return false;
+        }
         slice = StringSlice(buffer, bytes_read).rstrip();
         copy_slice_to(config.cfg_host, sizeof(config.cfg_host), slice);
 
         // Port
         bytes_read = file.readBytesUntil('\n', buffer, sizeof(buffer));
+        if(bytes_read == 0)
+        {
+            return false;
+        }
         buffer[bytes_read] = 0;
         config.cfg_port = atol(buffer);
 
         // Path
         bytes_read = file.readBytesUntil('\n', buffer, sizeof(buffer));
+        if(bytes_read == 0)
+        {
+            return false;
+        }
         slice = StringSlice(buffer, bytes_read).rstrip();
         copy_slice_to(config.cfg_path, sizeof(config.cfg_path), slice);
 
@@ -61,6 +83,7 @@ namespace config
         return true;
     }
 
+    // TODO: Make this a function in StringSlice.
     static void copy_slice_to(char* dst, std::size_t dst_size, const StringSlice& slice)
     {
         std::size_t i;
