@@ -9,12 +9,12 @@
 #include <Fonts/FreeSans9pt7b.h>
 
 #include "string_slice.h"
-#include "simple_http_parser.hpp"
+#include "quote_manager.h"
+#include "web_downloader.h"
 
-// SSID & password
-#include "secrets.h"
-
+// Macro to turn on/off debug serial messages.
 #define NDEBUG
+#include "debug_serial.h"
 
 using namespace scottz0r;
 
@@ -26,146 +26,24 @@ constexpr auto EPD_DC = 15;
 constexpr auto EPD_RESET = -1;
 constexpr auto EPD_BUSY = -1; // No connected on featherwing.
 
-// Would also be great to config?
-const char* host = "192.168.1.101";
-const int http_port = 5000;
-
-static constexpr unsigned long REQUEST_TIMEOUT_MS = 5000;
-
-// Make this a "safe buffer"
-constexpr auto BUFFER_SIZE = 1024 * 4;
-char buffer[BUFFER_SIZE];
-
 Adafruit_SSD1675 display(250, 122, EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
 
 void setup()
 {
-    pinMode(13, OUTPUT);
-    digitalWrite(13, LOW);
-
 #ifndef NDEBUG
     Serial.begin(115200);
-
-    Serial.println();
-    Serial.print("Connecting to ");
-    Serial.println(CFG_SSID);
 #endif
+    DEBUG_PRINTLN("Starting!");
 
-    // Display initialization.
-    display.begin();
+    // TODO: State - if a file needs to be re-downloaded.
 
-    // WiFi initialization.
-    WiFi.begin(CFG_SSID, CFG_PASSWORD);
 
-    while(WiFi.status() != WL_CONNECTED)
-    {
-        delay(500);
-        Serial.print(".");
-    }
-
-#ifndef NDEBUG
-    Serial.println("");
-    Serial.println("WiFi Connected");
-    Serial.println("IP Address: ");
-    Serial.println(WiFi.localIP());
-#endif
-
-    auto request_size = fetch_web();
-    if(request_size > 0)
-    {
-        // Parse out HTTP body and send to display.
-        auto buffer_slice = StringSlice(buffer, request_size);
-        auto http_body = http::get_body(buffer_slice);
-
-        wrap_and_display(http_body);
-    }
 
     // Go to deep sleep. Requires pin 16 to be wired to reset. 60e6 = 1 minute.
-#ifndef NDEBUG
-    Serial.println("Going to sleep...");
-#endif
+    DEBUG_PRINTLN("Going to sleep...");
 
     constexpr auto sleep_time = (uint64_t)60e6 * 60;
     ESP.deepSleep(sleep_time);
-}
-
-std::size_t fetch_web()
-{
-#ifndef NDEBUG
-    Serial.print("Connecting to ");
-    Serial.println(host);
-#endif
-
-    WiFiClient client;
-    if(!client.connect(host, http_port))
-    {
-        Serial.println("Failed to connect to host.");
-        return 0;
-    }
-
-    String url = "/";
-#ifndef NDEBUG
-    Serial.print("Requesting URL: ");
-    Serial.println(url);
-#endif
-
-    // This will send the request to the server
-    // client.print(String("GET ") + url + " HTTP/1.1\r\n" +
-    //             "Host: " + host + "\r\n" + 
-    //             "Connection: close\r\n\r\n");    
-    buffer[0] = 0;
-    strcpy(buffer, "GET / HTTP/1.1\r\n");
-    strcat(buffer, "Host: ");
-    strcat(buffer, host);
-    strcat(buffer, "\r\nConnection: close\r\n\r\n");
-    client.print(buffer);
-
-    // Read all the lines of the reply from server and print them to Serial
-    auto timeout = millis();
-    size_t i = 0;
-    while(client.connected() || client.available())
-    {
-        // Timeout logic for request. If all bytes not fetched, return 0 to indicate error.
-        if(millis() - timeout > REQUEST_TIMEOUT_MS)
-        {
-#ifndef NDEBUG
-    Serial.println("Client request timeout!");
-#endif
-            return 0;
-        }
-
-        if(client.available())
-        {
-            buffer[i] = client.read();
-            ++i;
-
-            // Overflow condition: Way too big, so stop. Our web service should know of embedded limits.
-            if(i == BUFFER_SIZE)
-            {
-                // TODO: Error and not display.
-                --i;
-                break;
-            }
-        }
-    }
-
-    // Always null terminate buffer.
-    buffer[i] = 0;
-
-#ifndef NDEBUG
-    Serial.write(buffer, i);
-    Serial.print("\r\n");
-    Serial.print("HTTP message used ");
-    Serial.print(i);
-    Serial.print(" bytes in buffer (");
-    Serial.print(BUFFER_SIZE);
-    Serial.print(" max).\r\n");
-    Serial.print("Now displaying...\r\n\r\n");
-#endif
-
-    client.stop();
-
-    return i;
 }
 
 static StringSlice get_word(StringSlice& buffer)
@@ -189,7 +67,7 @@ static StringSlice get_word(StringSlice& buffer)
     }
 }
 
-static void wrap_and_display(const StringSlice& text)
+static void wrap_and_display(const StringSlice& text, const StringSlice& name)
 {
     StringSlice ss = text;
 
@@ -234,17 +112,27 @@ static void wrap_and_display(const StringSlice& text)
         display.write(' ');
     }
 
-    // Write the "-Bender Rodriguez" in the bottom right. Draw a line above this.
-    const char* benders_name = "Bender Rodriguez";
+    // Write the name in the bottom right. Draw a line above this.
+    if(name.size() < word_buffer_size)
+    {
+        memcpy(word_buffer, name.data(), name.size());
+        word_buffer[name.size()] = 0;
+    }
+    else
+    {
+        memcpy(word_buffer, name.data(), word_buffer_size);
+        word_buffer[word_buffer_size - 1] = 0;
+    }
+
     display.setTextColor(EPD_BLACK);
     display.setFont(&FreeSans9pt7b);
     display.setTextSize(1);
-    display.getTextBounds(benders_name, 0, 0, &x1, &y1, &width, &height);
+    display.getTextBounds(word_buffer, 0, 0, &x1, &y1, &width, &height);
     
     auto name_x = display.width() - width - 2; // Add 2px padding from the right
     auto name_y = display.height() - 6; // 6px bottom padding (cursor position is bottom of text).
     display.setCursor(name_x, name_y);
-    display.print(benders_name);
+    display.print(word_buffer);
 
     // Line:
     auto line_y = name_y - height - 4;
