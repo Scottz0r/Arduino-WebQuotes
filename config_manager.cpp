@@ -5,14 +5,60 @@
 
 #include "string_slice.h"
 #include "debug_serial.h"
+#include "sys_config.h"
 
 namespace scottz0r
 {
-namespace config
-{
+    // Extern declared in config_manager.h
+    ConfigManager config;
+
     static void copy_slice_to(char* dst, std::size_t dst_size, const StringSlice& slice);
 
-    bool load_config(WebConfig& config)
+    ConfigManager::ConfigManager()
+    {
+        _set_defaults();
+    }
+
+    const WebConfig& ConfigManager::get() const
+    {
+        return m_values;
+    }
+
+    bool ConfigManager::load()
+    {
+        bool result = _try_load();
+
+        if(!result)
+        {
+            DEBUG_PRINTLN("Configuration failed. Resetting to defaults.");
+            _set_defaults();
+        }
+        else
+        {
+            m_is_loaded = true;
+        }
+        
+        return result;
+    }
+
+    ConfigManager::operator bool() const
+    {
+        return m_is_loaded;
+    }
+
+    void ConfigManager::_set_defaults()
+    {
+        m_values.refresh_count = refresh_count; // System default value.
+        m_values.wifi_ssid[0] = 0;
+        m_values.wifi_pwd[0] = 0;
+        m_values.cfg_host[0] = 0;
+        m_values.cfg_port = 0;
+        m_values.cfg_path[0] = 0;
+
+        m_is_loaded = false;
+    }
+
+    bool ConfigManager::_try_load()
     {
         DEBUG_PRINTLN("Attempting to load configuration...");
 
@@ -34,6 +80,15 @@ namespace config
         StringSlice slice;
 
         // TODO: Maybe a "get line" function for a stream reference?
+        // Refresh count (how many times until redownloading)
+        bytes_read = file.readBytesUntil('\n', buffer, sizeof(buffer));
+        if(bytes_read == 0)
+        {
+            return false;
+        }
+        buffer[bytes_read] = 0;
+        m_values.refresh_count = atol(buffer);
+
         // WiFi SSID
         bytes_read = file.readBytesUntil('\n', buffer, sizeof(buffer));
         if(bytes_read == 0)
@@ -41,7 +96,7 @@ namespace config
             return false;
         }
         slice = StringSlice(buffer, bytes_read).rstrip();
-        copy_slice_to(config.wifi_ssid, sizeof(config.wifi_ssid), slice);
+        copy_slice_to(m_values.wifi_ssid, sizeof(m_values.wifi_ssid), slice);
 
         // WiFi Password
         bytes_read = file.readBytesUntil('\n', buffer, sizeof(buffer));
@@ -50,7 +105,7 @@ namespace config
             return false;
         }
         slice = StringSlice(buffer, bytes_read).rstrip();
-        copy_slice_to(config.wifi_pwd, sizeof(config.wifi_pwd), slice);
+        copy_slice_to(m_values.wifi_pwd, sizeof(m_values.wifi_pwd), slice);
 
         // Host
         bytes_read = file.readBytesUntil('\n', buffer, sizeof(buffer));
@@ -59,7 +114,7 @@ namespace config
             return false;
         }
         slice = StringSlice(buffer, bytes_read).rstrip();
-        copy_slice_to(config.cfg_host, sizeof(config.cfg_host), slice);
+        copy_slice_to(m_values.cfg_host, sizeof(m_values.cfg_host), slice);
 
         // Port
         bytes_read = file.readBytesUntil('\n', buffer, sizeof(buffer));
@@ -68,7 +123,7 @@ namespace config
             return false;
         }
         buffer[bytes_read] = 0;
-        config.cfg_port = atol(buffer);
+        m_values.cfg_port = atol(buffer);
 
         // Path
         bytes_read = file.readBytesUntil('\n', buffer, sizeof(buffer));
@@ -77,7 +132,7 @@ namespace config
             return false;
         }
         slice = StringSlice(buffer, bytes_read).rstrip();
-        copy_slice_to(config.cfg_path, sizeof(config.cfg_path), slice);
+        copy_slice_to(m_values.cfg_path, sizeof(m_values.cfg_path), slice);
 
         DEBUG_PRINTLN("Config loaded successfully!");
         return true;
@@ -101,4 +156,4 @@ namespace config
             dst[dst_size - 1] = 0;
         }
     }
-}}
+}

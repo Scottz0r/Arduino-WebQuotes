@@ -2,29 +2,16 @@
 #include <string.h>
 #include <SD.h>
 
-#include <Adafruit_GFX.h>
-#include <Adafruit_EPD.h>
-#include <Fonts/FreeSerif9pt7b.h>
-#include <Fonts/FreeSans9pt7b.h>
-
+#include "config_manager.h"
+#include "debug_serial.h"
+#include "eink_display.h"
+#include "prj_pins.h"
+#include "state_manager.h"
 #include "string_slice.h"
 #include "quote_manager.h"
 #include "web_downloader.h"
-#include "state_manager.h"
-
-#include "debug_serial.h"
 
 using namespace scottz0r;
-
-// E-Ink configuration
-constexpr auto SD_CS = 2;
-constexpr auto SRAM_CS = -1; // Cannot use because on same pin as reset.
-constexpr auto EPD_CS = 0;
-constexpr auto EPD_DC = 15;
-constexpr auto EPD_RESET = -1;
-constexpr auto EPD_BUSY = -1; // No connected on featherwing.
-
-Adafruit_SSD1675 display(250, 122, EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
 
 QuoteManager quote_manager;
 
@@ -33,18 +20,23 @@ void setup()
 #ifndef NDEBUG
     Serial.begin(115200);
 #endif
+
     DEBUG_PRINTLN("Starting!");
 
-    DEBUG_PRINTLN("Initializing Display...");
-    display.begin();
+    display::begin();
 
     DEBUG_PRINTLN("Initializing SD...");
-
     if(!SD.begin(SD_CS))
     {
-        display_error("SD card missing.");
+        display::display_error("SD card missing.");
         deep_sleep();
         return;
+    }
+
+    // Load config, must be after SD initialization. Load fail can be recovered from.
+    if(!config.load())
+    {
+        DEBUG_PRINTLN("Config load failed, but program execution will continue.");
     }
 
     program_main();
@@ -64,9 +56,8 @@ void deep_sleep()
 
 void program_main()
 {
-    // TODO: Make this config value:
-    // constexpr int max_count = 24 * 7; // 24 times a day, 7 days (download every week)
-    constexpr int max_count = 24 * 1; // 24 times a day, 1 day (download every day)
+    // Get max refresh count from config. Assumes this is defaulted to a reasonable number upon config failure.
+    int max_count = config.get().refresh_count;
 
     state::State pgm_state;
     state::get_state(pgm_state);
@@ -90,7 +81,7 @@ void program_main()
             // If a file could not be downloaded, and there are 0 quotes from an existing file, then hard error
             // because there is nothing to display.
             DEBUG_PRINTLN("Quote download failed!");
-            display_error("Download failed. Communication error or file corrupt.");
+            display::display_error("Download failed. Communication error or file corrupt.");
             return;
         }
         else
@@ -121,145 +112,29 @@ void program_main()
     DEBUG_PRINT("Random index: ");
     DEBUG_PRINTLN(random_idx);
 
-    if(quote_manager.load_quote(random_idx))
-    {
-        DEBUG_PRINTLN("Got quote. Now displaying...");
-        StringSlice text = quote_manager.get_quote();
-        StringSlice name = quote_manager.get_name();
-        wrap_and_display(text, name);
+    QuoteManager quote_manager;
 
-        // Save state.
-        DEBUG_PRINTLN("Saving state...");
-        pgm_state.last_idx = random_idx;
-        pgm_state.count += 1;
-        state::set_state(pgm_state);
-    }
-    else
+    if(!quote_manager.load_quote(random_idx))
     {
         DEBUG_PRINTLN("Quote load failed!");
-        // TODO: Error - no quote. Cannot really recover from this?
-    }
-}
-
-static StringSlice get_word(StringSlice& buffer)
-{
-    // TODO: Find ,.;:\n etc.
-    auto pos = buffer.find(' ');
-
-    if (pos != StringSlice::npos)
-    {
-        // If word found, return the word and jump the input buffer after the word and whitespace/punctuation.
-        auto word = buffer.substr(0, pos);
-        buffer = buffer.substr(pos + 1);
-        return word;
-    }
-    else
-    {
-        // When on the last word, set the buffer to empty and return the contents of the buffer.
-        auto word = buffer;
-        buffer = StringSlice();
-        return word;
-    }
-}
-
-static void wrap_and_display(const StringSlice& text, const StringSlice& name)
-{
-    DEBUG_PRINTLN("Displaying start!");
-
-    StringSlice ss = text;
-
-    display.clearBuffer();
-
-    DEBUG_PRINTLN("Chunking and wrapping words...");
-
-    constexpr auto word_buffer_size = 64;
-    char word_buffer[word_buffer_size];
-
-    constexpr auto top_offset = 16; // pixels
-
-    display.setTextColor(EPD_BLACK);
-    display.setFont(&FreeSerif9pt7b);
-    display.setTextSize(1);
-    display.setTextWrap(false);
-    display.setCursor(0, top_offset);
-
-    int16_t x1, y1;
-    uint16_t width, height;
-
-    while(!ss.empty())
-    {
-        // TODO: Better buffer copying?
-        auto word = get_word(ss);
-        if(word.size() < word_buffer_size)
-        {
-            memcpy(word_buffer, word.data(), word.size());
-            word_buffer[word.size()] = 0;
-        }
-    
-        display.getTextBounds(word_buffer, display.getCursorX(), display.getCursorY(), &x1, &y1, &width, &height);
-
-        if(x1 + width > display.width())
-        {
-            // Wrap using GFX's library newline handling.
-            display.write('\r');
-            display.write('\n');
-        }
-
-        display.print(word_buffer);
-
-        // Write a space after each word.
-        display.write(' ');
+        // No quote, but a file exists. Cannot recover at this point. Update state to force a re-download next time,
+        // then give up on life.
+        pgm_state.count = max_count + 42;
+        state::set_state(pgm_state);
+        display::display_error("Something went very wrong.");
+        return;
     }
 
-    DEBUG_PRINTLN("Formatting name...");
+    DEBUG_PRINTLN("Got quote. Now displaying...");
+    StringSlice text = quote_manager.get_quote();
+    StringSlice name = quote_manager.get_name();
+    display::display_quote(text, name);
 
-    // Write the name in the bottom right. Draw a line above this.
-    if(name.size() < word_buffer_size)
-    {
-        memcpy(word_buffer, name.data(), name.size());
-        word_buffer[name.size()] = 0;
-    }
-    else
-    {
-        memcpy(word_buffer, name.data(), word_buffer_size);
-        word_buffer[word_buffer_size - 1] = 0;
-    }
-
-    display.setTextColor(EPD_BLACK);
-    display.setFont(&FreeSans9pt7b);
-    display.setTextSize(1);
-    display.getTextBounds(word_buffer, 0, 0, &x1, &y1, &width, &height);
-    
-    auto name_x = display.width() - width - 6; // Number: add padding from the right
-    auto name_y = display.height() - 6; // 6px bottom padding (cursor position is bottom of text).
-    display.setCursor(name_x, name_y);
-    display.print(word_buffer);
-
-    // Line:
-    auto line_y = name_y - height - 4;
-    display.drawFastHLine(0, line_y, display.width(), EPD_BLACK);
-
-    display.display();
-
-    DEBUG_PRINTLN("Displaying done!");
-}
-
-static void display_error(const char* errmsg)
-{
-    display.clearBuffer();
-
-    DEBUG_PRINTLN("Writing error...");
-
-    display.setTextColor(EPD_BLACK);
-    display.setFont(nullptr);
-    display.setTextSize(1);
-    display.setTextWrap(true);
-    display.setCursor(0, 0);
-
-    display.print("ERROR: ");
-    display.print(errmsg);
-
-    display.display();
+    // Save state.
+    DEBUG_PRINTLN("Saving state...");
+    pgm_state.last_idx = random_idx;
+    pgm_state.count += 1;
+    state::set_state(pgm_state);
 }
 
 void loop()

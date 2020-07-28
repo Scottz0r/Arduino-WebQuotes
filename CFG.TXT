@@ -1,3 +1,4 @@
+24
 WIFI-SSID
 WIFI-PASSWORD
 raw.githubusercontent.com

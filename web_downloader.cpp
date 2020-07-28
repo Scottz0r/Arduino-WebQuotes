@@ -14,8 +14,6 @@ namespace scottz0r
 {
 namespace web
 {
-    using namespace scottz0r::config;
-
     static void disconnect_wifi();
     static bool download_file(const WebConfig& config);
     static bool init_wifi(const WebConfig& config);
@@ -24,23 +22,21 @@ namespace web
     
     bool download_file()
     {
-        WebConfig config;
-
-        // Load WiFi configuration
-        if(!load_config(config))
+        // Make sure configuration has been loaded. Assumes config was loaded before this method call.
+        if(!config)
         {
             return false;
         }
 
         // Initialize WiFi connection
-        if(!init_wifi(config))
+        if(!init_wifi(config.get()))
         {
             disconnect_wifi();
             return false;
         }
 
         // Download file
-        if(!download_file(config))
+        if(!download_file(config.get()))
         {
             disconnect_wifi();
             return false;

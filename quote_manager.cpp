@@ -75,17 +75,9 @@ namespace scottz0r
         unsigned i = 0;
         while(file.available())
         {
-            DEBUG_PRINTLN("Skipping quote");
-            bool truncated;
-            auto bytes_read = get_line(file, m_buffer, sizeof(m_buffer), truncated);
-            if(bytes_read > 0)
-            {
-                StringSlice slice(m_buffer, bytes_read);
-                if(!slice.strip().empty())
-                {
-                    ++i;
-                }
-            }
+            // Assumes file format is valid.
+            skip_line(file);
+            ++i;
         }
 
         return i;

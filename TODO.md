@@ -18,13 +18,13 @@
   - [x] Max text size (???)
 - [x] Make it select a random number, based off of total number of quotes, and show that.
   - [x] After n-times doing this, redownload a list form the internet.
-- [ ] Display module.
-- [ ] Configure refresh interval (CFG file).
+- [x] Display module.
+- [x] Configure refresh interval (CFG file).
 - [ ] Debug log to SD card (LOG.TXT).
-  - [ ] Somehow enable/disable serial logging?
 - [ ] Make char buffer stuff more safe
   - [ ] Make a method to copy StringSlice to null terminated string char* buffer.
   - [x] Maybe a better "get_line" method for streams? That always read to a newline (or EoF).
+- [ ] Try to clean up `setup()` method and make flow a bit better? Maybe make a hard-error method when multiple things can cause exit conditions?
 
 - [x] Test project: Can SecureClient make request to HTTP? Do I need logic to load another WiFiClient depending on HTTPS?
   - Answer: No. But, this is low priority because of free file host on GitHub.
