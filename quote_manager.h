@@ -24,6 +24,8 @@ namespace scottz0r
         char m_buffer[256];
         std::size_t m_data_size;
     };
+
+    bool validate_file(const char* filename);
 }
 
 #endif // _SCOTTZ0R_QUOTE_MANAGER_H_INCLUDE_GUARD

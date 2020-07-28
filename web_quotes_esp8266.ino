@@ -39,10 +39,21 @@ void setup()
     display.begin();
 
     DEBUG_PRINTLN("Initializing SD...");
-    SD.begin(SD_CS);
+
+    if(!SD.begin(SD_CS))
+    {
+        display_error("SD card missing.");
+        deep_sleep();
+        return;
+    }
 
     program_main();
+    
+    deep_sleep();
+}
 
+void deep_sleep()
+{
     // TODO: Configure Deep sleep time?
     // Go to deep sleep. Requires pin 16 to be wired to reset. 60e6 = 1 minute.
     DEBUG_PRINTLN("Going to sleep...");
@@ -74,10 +85,13 @@ void program_main()
     if(num_quotes == 0 || pgm_state.count >= max_count)
     {
         DEBUG_PRINTLN("No quotes found or need new quotes...");
-        if(!web::download_file())
+        if(!web::download_file() && num_quotes == 0)
         {
+            // If a file could not be downloaded, and there are 0 quotes from an existing file, then hard error
+            // because there is nothing to display.
             DEBUG_PRINTLN("Quote download failed!");
-            // TODO: Error - display failure? Can recover if file still there?
+            display_error("Download failed. Communication error or file corrupt.");
+            return;
         }
         else
         {
@@ -228,6 +242,24 @@ static void wrap_and_display(const StringSlice& text, const StringSlice& name)
     display.display();
 
     DEBUG_PRINTLN("Displaying done!");
+}
+
+static void display_error(const char* errmsg)
+{
+    display.clearBuffer();
+
+    DEBUG_PRINTLN("Writing error...");
+
+    display.setTextColor(EPD_BLACK);
+    display.setFont(nullptr);
+    display.setTextSize(1);
+    display.setTextWrap(true);
+    display.setCursor(0, 0);
+
+    display.print("ERROR: ");
+    display.print(errmsg);
+
+    display.display();
 }
 
 void loop()

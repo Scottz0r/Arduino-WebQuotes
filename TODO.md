@@ -3,20 +3,19 @@
 - [x] E-ink busy pin versus timeout (would have to solder wire to pad).
 - [x] Need to actually parse HTTP message (have side C++ project).
 - [x] Change response to allow for different attributions. Something like `[person]quote`
-- [ ] Probably do these in side projects to get working code:
+- [x] Probably do these in side projects to get working code:
   - [x] Logic break text at word bounds?
-  - [ ] Drawing a bender Bitmap or small bender icon?
 - [x] Need to power down after displaying.
-- [ ] Timeout/error handling (including non 200 responses).
+- [x] Timeout/error handling (including non 200 responses).
 - [x] "Debug" print macro? Current ifdef stuff is hard to read. Make it a noop if NDEBUG defined.
 - [x] Test project to download response and save to SD card.
 - [x] Put WiFi configuration on file in SD card.
-- [ ] Verify downloaded data file for assumptions (max length on name and text).
+- [x] Verify downloaded data file for assumptions (max length on name and text).
 - [x] Counting quotes and EOF handling. Does current code work as expected without an newline at EOF?
-- [ ] Verify file is valid before replacing existing file.
-  - [ ] Maximum length
-  - [ ] Max name size (63)
-  - [ ] Max text size (???)
+- [x] Verify file is valid before replacing existing file.
+  - [x] Maximum length
+  - [x] Max name size (63)
+  - [x] Max text size (???)
 - [x] Make it select a random number, based off of total number of quotes, and show that.
   - [x] After n-times doing this, redownload a list form the internet.
 - [ ] Display module.

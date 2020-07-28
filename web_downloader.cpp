@@ -4,6 +4,7 @@
 #include <ESP8266WiFi.h>
 #include <SD.h>
 
+#include "quote_manager.h"
 #include "config_manager.h"
 #include "debug_serial.h"
 #include "string_slice.h"
@@ -47,7 +48,11 @@ namespace web
 
         disconnect_wifi();
 
-        // TODO: Need to validate file before swapping.
+        // Validate file before swapping.
+        if(!validate_file(download_filename))
+        {
+            return false;
+        }
 
         // Swap files.
         if(!swap_files())
