@@ -24,8 +24,10 @@
 - [ ] Make char buffer stuff more safe
   - [ ] Make a method to copy StringSlice to null terminated string char* buffer.
   - [x] Maybe a better "get_line" method for streams? That always read to a newline (or EoF).
-- [ ] Try to clean up `setup()` method and make flow a bit better? Maybe make a hard-error method when multiple things can cause exit conditions?
-
+- [x] Try to clean up `setup()` method and make flow a bit better? Maybe make a hard-error method when multiple things can cause exit conditions?
+- [x] Have data file specify count at top of file (to save processing).
+- [x] Better random number: Don't pick a quote that has shown up in the last n times.
+- [x] Better state: Save as a binary file for performance.
 - [x] Test project: Can SecureClient make request to HTTP? Do I need logic to load another WiFiClient depending on HTTPS?
   - Answer: No. But, this is low priority because of free file host on GitHub.
 

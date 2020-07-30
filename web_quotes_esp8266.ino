@@ -69,9 +69,6 @@ void program_main()
     DEBUG_PRINT("Current count: ");
     DEBUG_PRINTLN(pgm_state.count);
 
-    DEBUG_PRINT("Last Index: ");
-    DEBUG_PRINTLN(pgm_state.last_idx);
-
     // No quotes = no file, or maximum number of refreshes expired. Go fetch a new file.
     if(num_quotes == 0 || pgm_state.count >= max_count)
     {
@@ -104,13 +101,16 @@ void program_main()
     std::size_t random_idx;
     auto rng = ESP.random();
     random_idx  = rng % (unsigned)num_quotes;
-    while(random_idx == pgm_state.last_idx)
+    while(state::has_been_shown_lately((uint16_t)random_idx, pgm_state))
     {
+        DEBUG_PRINT("Random number ");
+        DEBUG_PRINT((int)random_idx);
+        DEBUG_PRINTLN(" was in last few! Regenerating.");
         random_idx  = rng % (unsigned)num_quotes;
     }
 
     DEBUG_PRINT("Random index: ");
-    DEBUG_PRINTLN(random_idx);
+    DEBUG_PRINTLN((int)random_idx);
 
     QuoteManager quote_manager;
 
@@ -132,7 +132,7 @@ void program_main()
 
     // Save state.
     DEBUG_PRINTLN("Saving state...");
-    pgm_state.last_idx = random_idx;
+    state::set_shown_lately((uint16_t)random_idx, pgm_state);
     pgm_state.count += 1;
     state::set_state(pgm_state);
 }

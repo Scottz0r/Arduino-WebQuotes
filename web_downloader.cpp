@@ -44,12 +44,6 @@ namespace web
 
         disconnect_wifi();
 
-        // Validate file before swapping.
-        if(!validate_file(download_filename))
-        {
-            return false;
-        }
-
         // Swap files.
         if(!swap_files())
         {

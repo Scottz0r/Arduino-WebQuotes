@@ -10,7 +10,7 @@ namespace scottz0r
     constexpr auto data_filename = "DATA.TXT";
 
     // State file name
-    constexpr auto state_filename = "STATE.TXT";
+    constexpr auto state_filename = "STATE.BIN";
 
     // Configuration file name.
     constexpr char* config_filename = "CFG.TXT";

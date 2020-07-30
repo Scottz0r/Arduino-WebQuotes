@@ -29,6 +29,9 @@ namespace scottz0r
             return false;
         }
 
+        // Skip first line, which has count:
+        skip_line(file);
+
         std::size_t i = 0;
 
         while(file.available() && i < index)
@@ -59,7 +62,7 @@ namespace scottz0r
 
     unsigned QuoteManager::get_quote_count()
     {
-        DEBUG_PRINTLN("Counting quotes...");
+        DEBUG_PRINTLN("Getting quote count...");
 
         if(!SD.exists(data_filename))
         {
@@ -72,15 +75,16 @@ namespace scottz0r
             return 0;
         }
 
-        unsigned i = 0;
-        while(file.available())
+        // First line has count of quotes.
+        unsigned count = 0;
+        bool truncated = false;
+        auto bytes_read =  get_line(file, m_buffer, sizeof(m_buffer), truncated);
+        if(bytes_read > 0 && !truncated)
         {
-            // Assumes file format is valid.
-            skip_line(file);
-            ++i;
+            count = (unsigned)atoi(m_buffer);
         }
 
-        return i;
+        return count;
     }
 
     StringSlice QuoteManager::get_name() const
@@ -117,63 +121,5 @@ namespace scottz0r
         }
 
         return StringSlice();
-    }
-
-    bool validate_file(const char* filename)
-    {
-        // 63 chars for name, 1 char for pipe, 127 chars for text, carriage return and newline.
-        constexpr auto max_line_length = 193;
-        constexpr auto max_name_size = 63;
-
-        DEBUG_PRINTLN("Validating file...");
-
-        auto file = SD.open(filename);
-        if(!file)
-        {
-            return false;
-        }
-
-        char buffer[256];
-        bool success = true;
-
-        while(file.available() && success)
-        {
-            // Line must be less than maximum.
-            bool truncated = false;
-            auto line_size = get_line(file, buffer, sizeof(buffer), truncated);
-            if(line_size > max_line_length || truncated)
-            {
-                DEBUG_PRINTLN("Line too big.");
-                success =  false;
-            }
-
-            // Only the last line can be empty.
-            StringSlice line_slice(buffer, line_size);
-            if(line_slice.strip().empty())
-            {
-                DEBUG_PRINTLN("Empty line.");
-                success = false;
-            }
-
-            // Test that name is within bounds.
-            auto pos = line_slice.find('|');
-            if(pos == StringSlice::npos)
-            {
-                DEBUG_PRINTLN("Pipe not found on line.");
-                success = false;
-            }
-            else
-            {
-                auto name_slice = line_slice.substr(0, pos);
-                if(name_slice.size() > max_name_size)
-                {
-                    DEBUG_PRINTLN("Name too large.");
-                    success = false;
-                }
-            }
-        }
-
-        file.close();
-        return success;
     }
 }
