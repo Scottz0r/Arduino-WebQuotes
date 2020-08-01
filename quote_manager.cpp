@@ -1,7 +1,6 @@
 #include "quote_manager.h"
 
 #include <Arduino.h>
-#include <SD.h>
 
 #include "stream_util.h"
 #include "sys_config.h"
@@ -29,34 +28,91 @@ namespace scottz0r
             return false;
         }
 
-        // Skip first line, which has count:
-        skip_line(file);
+        bool success = _try_get_quote(file, index);
+        m_ready = success;       
 
-        std::size_t i = 0;
+        file.close();
+        return success;
+    }
 
-        while(file.available() && i < index)
+    bool QuoteManager::_try_get_quote(fs::File& file, std::size_t index)
+    {
+        constexpr auto header_bytes = 2;
+        constexpr auto index_bytes = 2;
+
+        // Read first two bytes to get total quote count. Make sure index is less than this. This assumes CPU is
+        // little endian.
+        if(file.available() < 2)
         {
-            skip_line(file);
-            ++i;
+            return false;
         }
+        uint16_t total_quotes =  file.read() | (file.read() << 8);
 
-        DEBUG_PRINTLN("Found quote");
+        DEBUG_PRINT("Total quotes: ");
+        DEBUG_PRINTLN((int)total_quotes);
 
-        bool truncated;
-        auto bytes_read = get_line(file, m_buffer, sizeof(m_buffer), truncated);
-        if(bytes_read == 0)
+        if(index >= total_quotes)
         {
             return false;
         }
 
-        m_data_size = bytes_read;
+        // Read the index for the given item. The position to seek to is 2 bytes (header) + index * 2 bytes.
+        std::size_t index_pos = header_bytes + (index * index_bytes);
 
-        DEBUG_PRINTLN("Quote found!");
-        DEBUG_PRINT("Quote is: ");
-        DEBUG_PRINTLN(m_buffer);
+        DEBUG_PRINT("Index position: ");
+        DEBUG_PRINTLN((int)index_pos);
 
-        m_ready = true;
-        file.close();
+        if(!file.seek(index_pos))
+        {
+            return false;
+        }
+
+        uint16_t quote_address = file.read() | (file.read() << 8);
+
+        DEBUG_PRINT("Quote Address: ");
+        DEBUG_PRINTLN((int)quote_address);
+
+        if(!file.seek(quote_address))
+        {
+            return false;
+        }
+
+        // The first two bytes contains the count of bytes for the name and text.
+        uint8_t name_size = file.read();
+        uint8_t quote_size = file.read();
+
+        DEBUG_PRINT("Name Size: ");
+        DEBUG_PRINTLN(name_size);
+        DEBUG_PRINT("Quote Size: ");
+        DEBUG_PRINTLN(quote_size);
+
+        // Make sure data will not cause a buffer overflow.
+        if(name_size > (sizeof(m_name) - 1) || quote_size > (sizeof(m_quote) - 1))
+        {
+            return false;
+        }
+
+        auto actual_name_size = file.readBytes(m_name, name_size);
+        auto actual_quote_size = file.readBytes(m_quote, quote_size);
+
+        // Make sure the read sizes are actually what the data file reports.
+        if(name_size != actual_name_size || quote_size != actual_quote_size)
+        {
+            return false;
+        }
+
+        // Null terminate inputs. Not hard required, but safer to do with character arrays.
+        m_name[name_size] = 0;
+        m_quote[quote_size] = 0;
+
+        m_name_size = name_size;
+        m_quote_size = quote_size;
+
+        DEBUG_PRINT("Name: ");
+        DEBUG_PRINTLN(m_name);
+        DEBUG_PRINT("Quote: ");
+        DEBUG_PRINTLN(m_quote);
+
         return true;
     }
 
@@ -75,15 +131,14 @@ namespace scottz0r
             return 0;
         }
 
-        // First line has count of quotes.
+        // Read first two bytes for the count.
         unsigned count = 0;
-        bool truncated = false;
-        auto bytes_read =  get_line(file, m_buffer, sizeof(m_buffer), truncated);
-        if(bytes_read > 0 && !truncated)
+        if(file.available() >= 2)
         {
-            count = (unsigned)atoi(m_buffer);
+            count =  file.read() | (file.read() << 8);
         }
 
+        file.close();
         return count;
     }
 
@@ -94,15 +149,7 @@ namespace scottz0r
             return StringSlice();
         }
 
-        StringSlice buffer(m_buffer, m_data_size);
-
-        auto pos = buffer.find('|');
-        if (pos != StringSlice::npos)
-        {
-            return buffer.substr(0, pos).strip();
-        }
-
-        return StringSlice();
+        return StringSlice(m_name, m_name_size);
     }
 
     StringSlice QuoteManager::get_quote() const
@@ -112,14 +159,6 @@ namespace scottz0r
             return StringSlice();
         }
 
-        StringSlice buffer(m_buffer, m_data_size);
-
-        auto pos = buffer.find('|');
-        if (pos != StringSlice::npos)
-        {
-            return buffer.substr(pos + 1).strip();
-        }
-
-        return StringSlice();
+        return StringSlice(m_quote, m_quote_size);
     }
 }

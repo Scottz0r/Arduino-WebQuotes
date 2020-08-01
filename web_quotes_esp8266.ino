@@ -97,21 +97,28 @@ void program_main()
 
     DEBUG_PRINTLN("Generating random index...");
 
-    // WiFi must be enabled for this:
+    // Get random number from ESP library (should use analog pin to get noise?)
+    constexpr auto max_loops = 100;
+    uint32_t rng;
     std::size_t random_idx;
-    auto rng = ESP.random();
-    random_idx  = rng % (unsigned)num_quotes;
-    while(state::has_been_shown_lately((uint16_t)random_idx, pgm_state))
+    bool shown_lately;
+    int ctr = 0;
+
+    do
     {
+        rng = ESP.random();
+        random_idx = rng % num_quotes;
+        shown_lately = state::has_been_shown_lately((uint16_t)random_idx, pgm_state);
+        ++ctr;
+
         DEBUG_PRINT("Random number ");
         DEBUG_PRINT((int)random_idx);
-        DEBUG_PRINTLN(" was in last few! Regenerating.");
-        random_idx  = rng % (unsigned)num_quotes;
+        DEBUG_PRINT(", Shown = ");
+        DEBUG_PRINTLN((int)shown_lately);
     }
+    while(shown_lately && ctr < max_loops);
 
-    DEBUG_PRINT("Random index: ");
-    DEBUG_PRINTLN((int)random_idx);
-
+    // Try to get the quote:
     QuoteManager quote_manager;
 
     if(!quote_manager.load_quote(random_idx))

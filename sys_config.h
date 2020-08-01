@@ -4,10 +4,10 @@
 namespace scottz0r
 {
     // "Temporary" filename to download
-    constexpr auto download_filename = "DOWNLD.TXT";
+    constexpr auto download_filename = "DOWNLD.BIN";
 
     // Data file for quotes.
-    constexpr auto data_filename = "DATA.TXT";
+    constexpr auto data_filename = "DATA.BIN";
 
     // State file name
     constexpr auto state_filename = "STATE.BIN";

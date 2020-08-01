@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include "string_slice.h"
+#include <SD.h>
 
 namespace scottz0r
 {
@@ -20,9 +21,15 @@ namespace scottz0r
         StringSlice get_quote() const;
 
     private:
+        bool _try_get_quote(fs::File& file, std::size_t index);
+
         bool m_ready;
-        char m_buffer[256];
-        std::size_t m_data_size;
+
+        char m_name[32];
+        unsigned m_name_size;
+        
+        char m_quote[124];
+        unsigned m_quote_size;
     };
 
     bool validate_file(const char* filename);

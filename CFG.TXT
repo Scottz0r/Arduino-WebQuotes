@@ -3,4 +3,4 @@ WIFI-SSID
 WIFI-PASSWORD
 raw.githubusercontent.com
 443
-/Scottz0r/Arduino-WebQuotes/init-dev/quotes.txt
+/Scottz0r/Arduino-WebQuotes/init-dev/quotes.bin

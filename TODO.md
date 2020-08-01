@@ -23,6 +23,7 @@
 - [ ] Debug log to SD card (LOG.TXT).
 - [ ] Make char buffer stuff more safe
   - [ ] Make a method to copy StringSlice to null terminated string char* buffer.
+  - [ ] Maybe a helper method to null terminate buffer with a size input?
   - [x] Maybe a better "get_line" method for streams? That always read to a newline (or EoF).
 - [x] Try to clean up `setup()` method and make flow a bit better? Maybe make a hard-error method when multiple things can cause exit conditions?
 - [x] Have data file specify count at top of file (to save processing).
@@ -30,6 +31,9 @@
 - [x] Better state: Save as a binary file for performance.
 - [x] Test project: Can SecureClient make request to HTTP? Do I need logic to load another WiFiClient depending on HTTPS?
   - Answer: No. But, this is low priority because of free file host on GitHub.
+- [x] Make data file binary for better performance.
+  - [x] Python to generate file?
+  - [x] Note: Processor is little endian.
 
 ## Version 2.0
 - [x] Change to download a file from github repo every n-times.
