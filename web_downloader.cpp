@@ -3,11 +3,11 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <SD.h>
+#include <StringSlice.h>
 
 #include "quote_manager.h"
 #include "config_manager.h"
 #include "debug_serial.h"
-#include "string_slice.h"
 #include "sys_config.h"
 
 namespace scottz0r

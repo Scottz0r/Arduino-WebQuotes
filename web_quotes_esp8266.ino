@@ -1,13 +1,14 @@
 #include <Arduino.h>
 #include <string.h>
 #include <SD.h>
+#include <StringSlice.h>
 
 #include "config_manager.h"
 #include "debug_serial.h"
 #include "eink_display.h"
+#include "logging.h"
 #include "prj_pins.h"
 #include "state_manager.h"
-#include "string_slice.h"
 #include "quote_manager.h"
 #include "web_downloader.h"
 
@@ -33,10 +34,14 @@ void setup()
         return;
     }
 
+    // Start logger, which must be done after SD initialization.
+    Log.begin();
+
     // Load config, must be after SD initialization. Load fail can be recovered from.
     if(!config.load())
     {
         DEBUG_PRINTLN("Config load failed, but program execution will continue.");
+        Log.println("Config load failed.");
     }
 
     program_main();
@@ -44,11 +49,16 @@ void setup()
     deep_sleep();
 }
 
+// Deep sleep, which acts like an "exit" function. All paths will eventually end up here. This will put the processor
+// in a low power deep sleep state, and will wakeup with the reset pin.
 void deep_sleep()
 {
     // TODO: Configure Deep sleep time?
     // Go to deep sleep. Requires pin 16 to be wired to reset. 60e6 = 1 minute.
     DEBUG_PRINTLN("Going to sleep...");
+
+    // Flush log.
+    Log.close();
 
     constexpr auto sleep_time = (uint64_t)60e6 * 60;
     ESP.deepSleep(sleep_time);
@@ -79,10 +89,13 @@ void program_main()
             // because there is nothing to display.
             DEBUG_PRINTLN("Quote download failed!");
             display::display_error("Download failed. Communication error or file corrupt.");
+            Log.println("Download failed.");
             return;
         }
         else
         {
+            Log.println("Download successful.");
+
             // Reset count state on a successful download only.
             pgm_state.count = 0;
 
@@ -119,8 +132,6 @@ void program_main()
     while(shown_lately && ctr < max_loops);
 
     // Try to get the quote:
-    QuoteManager quote_manager;
-
     if(!quote_manager.load_quote(random_idx))
     {
         DEBUG_PRINTLN("Quote load failed!");
@@ -129,6 +140,7 @@ void program_main()
         pgm_state.count = max_count + 42;
         state::set_state(pgm_state);
         display::display_error("Something went very wrong.");
+        Log.println("Quote load failed.");
         return;
     }
 
@@ -142,6 +154,10 @@ void program_main()
     state::set_shown_lately((uint16_t)random_idx, pgm_state);
     pgm_state.count += 1;
     state::set_state(pgm_state);
+
+    Log.print("Quote cycle successful with quote #");
+    Log.print((int)random_idx);
+    Log.println(".");;
 }
 
 void loop()

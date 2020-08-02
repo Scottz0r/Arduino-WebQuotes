@@ -1,7 +1,7 @@
 #ifndef _SCOTTZ0R_EINK_DISPLAY_H_INCLUDE_GUARD
 #define _SCOTTZ0R_EINK_DISPLAY_H_INCLUDE_GUARD
 
-#include "string_slice.h"
+#include <StringSlice.h>
 
 namespace scottz0r
 {

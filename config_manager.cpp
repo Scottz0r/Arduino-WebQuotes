@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include <SD.h>
 
-#include "string_slice.h"
+#include <StringSlice.h>
 #include "debug_serial.h"
 #include "sys_config.h"
 
@@ -11,8 +11,6 @@ namespace scottz0r
 {
     // Extern declared in config_manager.h
     ConfigManager config;
-
-    static void copy_slice_to(char* dst, std::size_t dst_size, const StringSlice& slice);
 
     ConfigManager::ConfigManager()
     {
@@ -96,7 +94,7 @@ namespace scottz0r
             return false;
         }
         slice = StringSlice(buffer, bytes_read).rstrip();
-        copy_slice_to(m_values.wifi_ssid, sizeof(m_values.wifi_ssid), slice);
+        slice.copy_to(m_values.wifi_ssid);
 
         // WiFi Password
         bytes_read = file.readBytesUntil('\n', buffer, sizeof(buffer));
@@ -105,7 +103,7 @@ namespace scottz0r
             return false;
         }
         slice = StringSlice(buffer, bytes_read).rstrip();
-        copy_slice_to(m_values.wifi_pwd, sizeof(m_values.wifi_pwd), slice);
+        slice.copy_to(m_values.wifi_pwd);
 
         // Host
         bytes_read = file.readBytesUntil('\n', buffer, sizeof(buffer));
@@ -114,7 +112,7 @@ namespace scottz0r
             return false;
         }
         slice = StringSlice(buffer, bytes_read).rstrip();
-        copy_slice_to(m_values.cfg_host, sizeof(m_values.cfg_host), slice);
+        slice.copy_to(m_values.cfg_host);
 
         // Port
         bytes_read = file.readBytesUntil('\n', buffer, sizeof(buffer));
@@ -132,28 +130,9 @@ namespace scottz0r
             return false;
         }
         slice = StringSlice(buffer, bytes_read).rstrip();
-        copy_slice_to(m_values.cfg_path, sizeof(m_values.cfg_path), slice);
+        slice.copy_to(m_values.cfg_path);
 
         DEBUG_PRINTLN("Config loaded successfully!");
         return true;
-    }
-
-    // TODO: Make this a function in StringSlice.
-    static void copy_slice_to(char* dst, std::size_t dst_size, const StringSlice& slice)
-    {
-        std::size_t i;
-        for(i = 0; i < dst_size && i < slice.size(); ++i)
-        {
-            dst[i] = slice[i];
-        }
-
-        if(i < dst_size)
-        {
-            dst[i] = 0;
-        }
-        else
-        {
-            dst[dst_size - 1] = 0;
-        }
     }
 }

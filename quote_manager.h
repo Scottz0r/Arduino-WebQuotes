@@ -2,7 +2,7 @@
 #define _SCOTTZ0R_QUOTE_MANAGER_H_INCLUDE_GUARD
 
 #include <stddef.h>
-#include "string_slice.h"
+#include <StringSlice.h>
 #include <SD.h>
 
 namespace scottz0r

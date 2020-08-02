@@ -48,13 +48,8 @@ namespace display
 
         while(!ss.empty())
         {
-            // TODO: Better buffer copying?
             auto word = get_word(ss);
-            if(word.size() < word_buffer_size)
-            {
-                memcpy(word_buffer, word.data(), word.size());
-                word_buffer[word.size()] = 0;
-            }
+            word.copy_to(word_buffer);
         
             display.getTextBounds(word_buffer, display.getCursorX(), display.getCursorY(), &x1, &y1, &width, &height);
 
@@ -73,17 +68,7 @@ namespace display
 
         DEBUG_PRINTLN("Formatting name...");
 
-        // Write the name in the bottom right. Draw a line above this.
-        if(name.size() < word_buffer_size)
-        {
-            memcpy(word_buffer, name.data(), name.size());
-            word_buffer[name.size()] = 0;
-        }
-        else
-        {
-            memcpy(word_buffer, name.data(), word_buffer_size);
-            word_buffer[word_buffer_size - 1] = 0;
-        }
+        name.copy_to(word_buffer);
 
         display.setTextColor(EPD_BLACK);
         display.setFont(&FreeSans9pt7b);

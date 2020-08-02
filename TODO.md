@@ -20,10 +20,10 @@
   - [x] After n-times doing this, redownload a list form the internet.
 - [x] Display module.
 - [x] Configure refresh interval (CFG file).
-- [ ] Debug log to SD card (LOG.TXT).
-- [ ] Make char buffer stuff more safe
-  - [ ] Make a method to copy StringSlice to null terminated string char* buffer.
-  - [ ] Maybe a helper method to null terminate buffer with a size input?
+- [x] Debug log to SD card (LOG.TXT).
+- [x] Make char buffer stuff more safe
+  - [x] Review for unsafe code.
+  - [x] Make a method to copy StringSlice to null terminated string char* buffer.
   - [x] Maybe a better "get_line" method for streams? That always read to a newline (or EoF).
 - [x] Try to clean up `setup()` method and make flow a bit better? Maybe make a hard-error method when multiple things can cause exit conditions?
 - [x] Have data file specify count at top of file (to save processing).
@@ -42,5 +42,5 @@
 - [x] Have jumper to force refresh from web (don't do. Can do this from modifying state file).
 
 ## Low Priority
-- [ ] Better HTTP message building without strcat.
-- [ ] Make GitHub repo for StringView?
+- [x] Make GitHub repo for StringSlice?
+  - [x] Use in this project.
