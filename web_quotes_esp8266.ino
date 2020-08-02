@@ -1,150 +1,163 @@
+#include <Arduino.h>
 #include <string.h>
+#include <SD.h>
+#include <StringSlice.h>
 
-#include <ESP8266WiFi.h>
+#include "config_manager.h"
+#include "debug_serial.h"
+#include "eink_display.h"
+#include "logging.h"
+#include "prj_pins.h"
+#include "state_manager.h"
+#include "quote_manager.h"
+#include "web_downloader.h"
 
-#include <Adafruit_GFX.h>
-#include <Adafruit_EPD.h>
-#include <Fonts/FreeMono9pt7b.h>
+using namespace scottz0r;
 
-// SSID & password
-#include "secrets.h"
-
-// E-Ink configuration
-constexpr auto SD_CS = 2;
-constexpr auto SRAM_CS = 16;
-constexpr auto EPD_CS = 0;
-constexpr auto EPD_DC = 15;
-constexpr auto EPD_RESET = -1;
-constexpr auto EPD_BUSY = -1; // TODO: Would be nice to figure out how to get this to work.
-
-// Would also be great to config?
-const char* host = "192.168.1.101";
-const int http_port = 5000;
-
-// Make this a "safe buffer"
-constexpr auto BUFFER_SIZE = 1024 * 4;
-char buffer[BUFFER_SIZE];
-
-Adafruit_SSD1675 display(250, 122, EPD_DC, EPD_RESET, EPD_CS, SRAM_CS, EPD_BUSY);
-
-void write_to_display();
-void fetch_web();
+QuoteManager quote_manager;
 
 void setup()
 {
-    pinMode(0, OUTPUT);
-    digitalWrite(0, LOW);
-
+#ifndef NDEBUG
     Serial.begin(115200);
-    delay(100);
+#endif
 
-    Serial.println();
-    Serial.print("Connecting to ");
-    Serial.println(CFG_SSID);
+    DEBUG_PRINTLN("Starting!");
 
-    // Display initialization.
-    display.begin();
+    display::begin();
 
-    // WiFi initialization.
-    WiFi.begin(CFG_SSID, CFG_PASSWORD);
-
-    while(WiFi.status() != WL_CONNECTED)
+    DEBUG_PRINTLN("Initializing SD...");
+    if(!SD.begin(SD_CS))
     {
-        delay(500);
-        Serial.print(".");
-    }
-
-    Serial.println("");
-    Serial.println("WiFi Connected");
-    Serial.println("IP Address: ");
-    Serial.println(WiFi.localIP());
-
-    fetch_web();
-}
-
-void fetch_web()
-{
-    Serial.print("Connecting to ");
-    Serial.println(host);
-
-    WiFiClient client;
-    if(!client.connect(host, http_port))
-    {
-        Serial.println("Failed to connect to host.");
+        display::display_error("SD card missing.");
+        deep_sleep();
         return;
     }
 
-    String url = "/";
-    Serial.print("Requesting URL: ");
-    Serial.println(url);
+    // Start logger, which must be done after SD initialization.
+    Log.begin();
 
-    // This will send the request to the server
-    // client.print(String("GET ") + url + " HTTP/1.1\r\n" +
-    //             "Host: " + host + "\r\n" + 
-    //             "Connection: close\r\n\r\n");    
-    buffer[0] = 0;
-    strcpy(buffer, "GET / HTTP/1.1\r\n");
-    strcat(buffer, "Host: ");
-    strcat(buffer, host);
-    strcat(buffer, "\r\nConnection: close\r\n\r\n");
-    client.print(buffer);
-
-    // Read all the lines of the reply from server and print them to Serial
-    size_t i = 0;
-    while(client.connected() || client.available())
+    // Load config, must be after SD initialization. Load fail can be recovered from.
+    if(!config.load())
     {
-        if(client.available())
-        {
-            // String line = client.readStringUntil('\r');
-            // Serial.print(line);
-            buffer[i] = client.read();
-            ++i;
-
-            // Overflow condition: Way too big, so stop. Our web service should know of embedded limits.
-            if(i == BUFFER_SIZE)
-            {
-                // TODO: Error and not display.
-                --i;
-                break;
-            }
-        }
+        DEBUG_PRINTLN("Config load failed, but program execution will continue.");
+        Log.println("Config load failed.");
     }
 
-    // Always null terminate buffer.
-    buffer[i] = 0;
-
-    Serial.write(buffer, i);
-
-    Serial.print("\r\n");
-    Serial.print("HTTP message used ");
-    Serial.print(i);
-    Serial.print(" bytes in buffer (");
-    Serial.print(BUFFER_SIZE);
-    Serial.print(" max).\r\n");
-
-    Serial.print("Now displaying...\r\n\r\n");
-    write_to_display();
-
-    client.stop();
-
-    // TODO: Send to power down mode.
+    program_main();
+    
+    deep_sleep();
 }
 
-void write_to_display()
+// Deep sleep, which acts like an "exit" function. All paths will eventually end up here. This will put the processor
+// in a low power deep sleep state, and will wakeup with the reset pin.
+void deep_sleep()
 {
-    display.clearBuffer();
-    display.setCursor(0, 0);
-    display.setTextSize(1);
-    // This font is too large to put the entire HTTP response.
-    //display.setFont(&FreeMono9pt7b);
-    display.setTextColor(EPD_BLACK);
-    display.setTextWrap(true);
+    // TODO: Configure Deep sleep time?
+    // Go to deep sleep. Requires pin 16 to be wired to reset. 60e6 = 1 minute.
+    DEBUG_PRINTLN("Going to sleep...");
 
-    display.print(buffer);
+    // Flush log.
+    Log.close();
 
-    display.display();
+    constexpr auto sleep_time = (uint64_t)60e6 * 60;
+    ESP.deepSleep(sleep_time);
+}
 
-    Serial.print("Display done!\r\n");
+void program_main()
+{
+    // Get max refresh count from config. Assumes this is defaulted to a reasonable number upon config failure.
+    int max_count = config.get().refresh_count;
+
+    state::State pgm_state;
+    state::get_state(pgm_state);
+
+    auto num_quotes = quote_manager.get_quote_count();
+    DEBUG_PRINT("Number of quotes on SD card: ");
+    DEBUG_PRINTLN(num_quotes);
+    
+    DEBUG_PRINT("Current count: ");
+    DEBUG_PRINTLN(pgm_state.count);
+
+    // No quotes = no file, or maximum number of refreshes expired. Go fetch a new file.
+    if(num_quotes == 0 || pgm_state.count >= max_count)
+    {
+        DEBUG_PRINTLN("No quotes found or need new quotes...");
+        if(!web::download_file() && num_quotes == 0)
+        {
+            // If a file could not be downloaded, and there are 0 quotes from an existing file, then hard error
+            // because there is nothing to display.
+            DEBUG_PRINTLN("Quote download failed!");
+            display::display_error("Download failed. Communication error or file corrupt.");
+            Log.println("Download failed.");
+            return;
+        }
+        else
+        {
+            Log.println("Download successful.");
+
+            // Reset count state on a successful download only.
+            pgm_state.count = 0;
+
+            // Update number of quotes from newly downloaded file.
+            num_quotes = quote_manager.get_quote_count();
+        }
+    }
+    else
+    {
+        DEBUG_PRINTLN("Web download not required!");
+    }
+
+    DEBUG_PRINTLN("Generating random index...");
+
+    // Get random number from ESP library (should use analog pin to get noise?)
+    constexpr auto max_loops = 100;
+    uint32_t rng;
+    std::size_t random_idx;
+    bool shown_lately;
+    int ctr = 0;
+
+    do
+    {
+        rng = ESP.random();
+        random_idx = rng % num_quotes;
+        shown_lately = state::has_been_shown_lately((uint16_t)random_idx, pgm_state);
+        ++ctr;
+
+        DEBUG_PRINT("Random number ");
+        DEBUG_PRINT((int)random_idx);
+        DEBUG_PRINT(", Shown = ");
+        DEBUG_PRINTLN((int)shown_lately);
+    }
+    while(shown_lately && ctr < max_loops);
+
+    // Try to get the quote:
+    if(!quote_manager.load_quote(random_idx))
+    {
+        DEBUG_PRINTLN("Quote load failed!");
+        // No quote, but a file exists. Cannot recover at this point. Update state to force a re-download next time,
+        // then give up on life.
+        pgm_state.count = max_count + 42;
+        state::set_state(pgm_state);
+        display::display_error("Something went very wrong.");
+        Log.println("Quote load failed.");
+        return;
+    }
+
+    DEBUG_PRINTLN("Got quote. Now displaying...");
+    StringSlice text = quote_manager.get_quote();
+    StringSlice name = quote_manager.get_name();
+    display::display_quote(text, name);
+
+    // Save state.
+    DEBUG_PRINTLN("Saving state...");
+    state::set_shown_lately((uint16_t)random_idx, pgm_state);
+    pgm_state.count += 1;
+    state::set_state(pgm_state);
+
+    Log.print("Quote cycle successful with quote #");
+    Log.print((int)random_idx);
+    Log.println(".");;
 }
 
 void loop()
