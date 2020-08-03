@@ -1,6 +1,6 @@
 # Web Quotes ESP8266
 
-![Picture of Project](https://raw.githubusercontent.com/Scottz0r/Arduino-WebQuotes/master/images/scottz0r-web-quotes-00.jpg)
+![Picture of Project](https://raw.githubusercontent.com/Scottz0r/Arduino-WebQuotes/master/images/scottz0r-web-quotes-00.png)
 
 This repository contains an Arduino project for an embedded system that downloads quotes from the internet and displays the quotes on an E-Ink screen. This is powered by an ESP8266 WiFi microchip.
 
